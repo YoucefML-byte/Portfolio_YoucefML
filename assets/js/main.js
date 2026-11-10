@@ -53,7 +53,52 @@
   }
 
   /* ---------- Projets ---------- */
-  const projects = (data.projects || []).slice().sort((a, b) => (b.featured === true) - (a.featured === true));
+  const allProjects = data.projects || [];
+  const ongoing = allProjects.filter((p) => p.status === 'en-cours');
+  const projects = allProjects.filter((p) => p.status !== 'en-cours')
+    .sort((a, b) => (b.featured === true) - (a.featured === true));
+
+  /* Projets en cours */
+  const STEP_LABELS = { done: 'Terminé', current: 'En cours', todo: 'À venir' };
+  const ongoingGrid = $('#ongoingGrid');
+  if (ongoingGrid) {
+    if (!ongoing.length) {
+      $('#projetsEnCours').hidden = true;
+    } else {
+      ongoingGrid.innerHTML = ongoing.map((p) => {
+        const steps = p.roadmap || [];
+        const current = steps.find((st) => st.state === 'current');
+        return `
+      <article class="ongoing" data-category="${esc(p.category)}">
+        <div class="ongoing-main">
+          <div class="project-meta">
+            <span class="project-cat">${esc(CATEGORIES[p.category] || 'Projet')}</span>
+            ${p.period ? `<span class="project-period">${esc(p.period)}</span>` : ''}
+          </div>
+          <h4>${esc(p.title)}</h4>
+          <p class="project-summary">${esc(p.summary || p.description)}</p>
+          ${current ? `<p class="ongoing-phase"><span>Phase actuelle</span><b>${esc(current.label)}</b></p>` : ''}
+          ${tagsHTML(p.tags)}
+          ${p.url && p.url !== '#' ? `<a class="report-cta" href="${esc(p.url)}" target="_blank" rel="noopener">Suivre le projet →</a>` : ''}
+        </div>
+        ${steps.length ? `
+        <div class="ongoing-roadmap">
+          <p class="roadmap-title">Feuille de route</p>
+          <ol class="roadmap">
+            ${steps.map((st, i) => `
+            <li class="step step--${esc(st.state || 'todo')}"${st.state === 'current' ? ' aria-current="step"' : ''}>
+              <span class="step-num" aria-hidden="true">${st.state === 'done' ? '✓' : i + 1}</span>
+              <span class="step-label">${esc(st.label)}</span>
+              <span class="step-state">${STEP_LABELS[st.state] || STEP_LABELS.todo}</span>
+            </li>`).join('')}
+          </ol>
+        </div>` : ''}
+      </article>`;
+      }).join('');
+    }
+  }
+
+  /* Projets terminés */
   const grid = $('#projectsGrid');
   if (grid) {
     grid.innerHTML = projects.map((p) => `
@@ -103,17 +148,17 @@
 
   /* ---------- Tableau de bord du hero (données réelles du portfolio) ---------- */
   const kpiProjects = $('#kpiProjects');
-  if (kpiProjects) kpiProjects.textContent = projects.length;
+  if (kpiProjects) kpiProjects.textContent = allProjects.length;
   const kpiTech = $('#kpiTech');
   if (kpiTech) {
     const tech = new Set();
-    [...projects, ...(data.experience || [])].forEach((p) => (p.tags || []).forEach((t) => tech.add(t.toLowerCase())));
+    [...allProjects, ...(data.experience || [])].forEach((p) => (p.tags || []).forEach((t) => tech.add(t.toLowerCase())));
     $$('#competences .chips li').filter((li) => !li.closest('[data-kpi-exclude]')).forEach((li) => tech.add(li.textContent.trim().toLowerCase()));
     kpiTech.textContent = tech.size;
   }
   const bars = $('#domainBars');
   if (bars) {
-    const counts = projects.reduce((acc, p) => (acc[p.category] = (acc[p.category] || 0) + 1, acc), {});
+    const counts = allProjects.reduce((acc, p) => (acc[p.category] = (acc[p.category] || 0) + 1, acc), {});
     // Ordre fixe : les domaines « data » d'abord, mis en valeur
     const core = ['data', 'bdd'];
     const rows = Object.keys(CATEGORIES).filter((k) => counts[k]).map((k) => [k, counts[k]]);
